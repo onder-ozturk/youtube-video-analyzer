@@ -1,0 +1,17 @@
+# Python / Jupyter
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# Env / secrets
+.env
+.env.*
+
+# Generated data outputs for this project
+storybox_videos*.csv
+analyzed_*videos*.csv
+temp_*.csv
+*labeled*.xlsx
+Helsinki_Opus_Transcript.xlsx
+response.json
+results/
