@@ -1,884 +1,1119 @@
-# Veri Setleri ve Veri Kaynakları Dokümantasyonu
+# YouTube Video Comprehensive Analyzer - Datasets Documentation
+# YouTube Video Kapsamlı Analiz - Veri Setleri Dokümantasyonu
 
-Bu doküman, "YouTube Video Comprehensive Analyzer" notebook'unda kullanılan tüm veri setlerini, veri kaynaklarını ve bunların nasıl kullanıldığını detaylı olarak açıklar.
+## Overview / Genel Bakış
 
-## İçindekiler
+This document describes all datasets, data sources, and data processing pipelines used in the **YouTube Video Comprehensive Analyzer** notebook.
 
-1. [Kullanılan Veri Setleri](#kullanılan-veri-setleri)
-2. [Veri Kaynakları ve API'ler](#veri-kaynakları-ve-apiler)
-3. [Veri Yükleme ve Ön İşleme](#veri-yükleme-ve-ön-işleme)
-4. [Çıktı Veri Dosyaları](#çıktı-veri-dosyaları)
-5. [Veri Akışı Diyagramı](#veri-akışı-diyagramı)
-6. [Kullanılan Kütüphaneler ve Modeller](#kullanılan-kütüphaneler-ve-modeller)
-7. [Konfigürasyon Parametreleri](#konfigürasyon-parametreleri)
+Bu doküman, **YouTube Video Kapsamlı Analiz** notebook'unda kullanılan tüm veri setlerini, veri kaynaklarını ve veri işleme süreçlerini detaylı olarak açıklar.
 
 ---
 
-## Kullanılan Veri Setleri
+## Table of Contents / İçindekiler
 
-### 1. StoryBox YouTube Playlist Veri Seti
+1. [Input Datasets / Giriş Veri Setleri](#input-datasets--giriş-veri-setleri)
+2. [API Data Sources / API Veri Kaynakları](#api-data-sources--api-veri-kaynakları)
+3. [Output Datasets / Çıktı Veri Setleri](#output-datasets--çıktı-veri-setleri)
+4. [Data Processing Pipeline / Veri İşleme Süreci](#data-processing-pipeline--veri-i̇şleme-süreci)
+5. [Machine Learning Models / Makine Öğrenmesi Modelleri](#machine-learning-models--makine-öğrenmesi-modelleri)
+6. [Dependencies & Requirements / Bağımlılıklar ve Gereksinimler](#dependencies--requirements--bağımlılıklar-ve-gereksinimler)
+7. [Data Flow Diagram / Veri Akış Diyagramı](#data-flow-diagram--veri-akış-diyagramı)
+8. [Configuration Parameters / Konfigürasyon Parametreleri](#configuration-parameters--konfigürasyon-parametreleri)
+9. [Troubleshooting / Sorun Giderme](#troubleshooting--sorun-giderme)
 
-**Kaynak Tipi**: YouTube API v3 Verisi
-**Format**: CSV Dosyaları (birden fazla encoding varyantı)
-**Köken**: YouTube Playlist (API üzerinden sağlanan playlist_id)
+---
 
-#### Oluşturulan Dosyalar:
-- `storybox_videos_utf8_bom.csv` - UTF-8 with BOM (Excel uyumlu)
-- `storybox_videos_utf8.csv` - Saf UTF-8 formatı
-- `storybox_videos_win1254.csv` - Windows-1254 Türkçe encoding
-- `storybox_videos_manual.csv` - Manuel encoding kontrolü
+## Input Datasets / Giriş Veri Setleri
 
-#### Veri Yapısı:
+### 1. YouTube Playlist Data (StoryBox)
+
+**Source / Kaynak**: YouTube Data API v3
+**Format**: CSV files with multiple encoding options / Çoklu encoding seçenekleriyle CSV dosyaları
+
+#### Input Files / Giriş Dosyaları:
+- `storybox_videos_utf8_bom.csv` - **Primary input file** (UTF-8 with BOM for Excel compatibility)
+  - **Excel için en uygun** (UTF-8 with BOM)
+  - Türkçe karakterler için otomatik tanıma
+
+- `storybox_videos_utf8.csv` - Pure UTF-8 encoding
+  - Saf UTF-8 formatı
+  - Genel programlama kullanımı için
+
+- `storybox_videos_win1254.csv` - Windows Turkish encoding (Windows-1254)
+  - Windows Türkçe sistemi için
+  - Eski Windows uyumluluğu
+
+- `storybox_videos_manual.csv` - Manual encoding control
+  - Manuel encoding kontrolü
+
+#### Content Structure / Veri Yapısı:
 ```csv
 title,url
-"Video Başlığı 1","https://www.youtube.com/watch?v=VIDEO_ID1"
-"Video Başlığı 2","https://www.youtube.com/watch?v=VIDEO_ID2"
+"Video Title","https://www.youtube.com/watch?v=VIDEO_ID"
+"Video Başlığı","https://www.youtube.com/watch?v=VIDEO_ID"
 ```
 
-**Sütunlar**:
-- `title`: Video başlığı (string)
-- `url`: YouTube video URL'si (string)
+**Fields / Alanlar**:
+- `title`: Video başlığı (Turkish characters supported / Türkçe karakter destekli)
+- `url`: YouTube video URL
+- Internally extracted: `video_id` (otomatik çıkarılır)
 
-**Kaynak**: YouTube Playlist Items API endpoint
-**İstek başına maksimum sonuç**: 50 öğe
-**Sayfalandırma**: nextPageToken ile pagination kullanılır
+**Purpose / Amaç**:
+- EN: Contains the initial list of YouTube videos from a specific playlist to be analyzed for transcripts, themes, and sentiment.
+- TR: Belirli bir YouTube oynatma listesinden alınan videoların başlangıç listesini içerir. Bu videolar transkript, tema ve duygu analizi için kullanılır.
+
+**Source Details / Kaynak Detayları**:
+- API Endpoint: `youtube.playlistItems().list()`
+- Max results per request: 50 items
+- Pagination: Uses `nextPageToken`
+- Authentication: Requires `YOUTUBE_API_KEY` environment variable
 
 ---
 
-### 2. Helsinki Opus Transcript Veri Seti
+### 2. Helsinki Opus Transcript Dataset
 
-**Kaynak Tipi**: Excel Dosyası (`.xlsx`)
-**Dosya Adı**: `Helsinki_Opus_Transcript.xlsx`
-**Format**: Yapılandırılmış sütunlar içeren Excel
+**File / Dosya**: `Helsinki_Opus_Transcript.xlsx`
+**Format**: Microsoft Excel (.xlsx)
+**Size**: Variable depending on playlist content / Playlist içeriğine göre değişken
 
-#### Gerekli Sütunlar:
-- `Video URL` - Analiz edilen videoların URL'leri
-- `Transcript` - YouTube'dan çıkarılan tam video transkriptleri
-- `Summary` - Video içeriğinin metin özetleri
+#### Content Structure / Veri Yapısı:
+The Excel file contains video transcripts with the following columns:
 
-#### Veri Yapısı Örneği:
-```
-Video URL                                    | Transcript                  | Summary
-https://www.youtube.com/watch?v=VIDEO_ID    | [Transkript metni...]       | [Özet metni...]
-```
+**Expected Columns / Beklenen Sütunlar**:
+- `title` or `video_title`: Video başlığı
+- `transcript` or `text`: Video transkript metni (full transcript text)
+- `url` or `video_url`: YouTube video linki
+- `summary` (optional): Video özeti
+- Additional metadata fields (optional)
 
-**Kullanım Amacı**:
-- Kümeleme analizi için hazır transkript ve özet verisi sağlar
-- Farklı kümeleme algoritmalarıyla karşılaştırma yapmak için kullanılır
-- LLM tabanlı etiketleme için kaynak veri
+**Purpose / Amaç**:
+- EN: Main dataset for theme clustering and content analysis. Contains full transcripts extracted from YouTube videos.
+- TR: Tema kümeleme ve içerik analizi için ana veri seti. YouTube videolarından çıkarılan tam transkriptleri içerir.
+
+**Usage in Notebook / Notebook'ta Kullanım**:
+- Cell 10-14: Clustering analysis (kümeleme analizi)
+- Default file path: `"Helsinki_Opus_Transcript.xlsx"`
+- Loaded using: `pd.read_excel(file_path)`
+- Encoding: UTF-8 by default
+
+**Data Quality Requirements / Veri Kalitesi Gereksinimleri**:
+- Minimum transcript length: 50 characters (çok kısa transkriptler filtrelenir)
+- No duplicate video URLs (duplicate kontrol yapılır)
+- Valid UTF-8 encoding (encoding doğrulaması)
 
 ---
 
-## Veri Kaynakları ve API'ler
+## API Data Sources / API Veri Kaynakları
 
-### A. YouTube Data API v3
+### 1. YouTube Data API v3
 
-**Amaç**: Playlist videolarını ve metadata'yı çıkarmak
-**Kimlik Doğrulama**: API anahtarı (ortam değişkeninden: `YOUTUBE_API_KEY`)
+**Service**: Google YouTube Data API
+**Authentication**: API Key required (API anahtarı gerekli)
+**Environment Variable**: `YOUTUBE_API_KEY`
 
-**Kullanılan Endpoint'ler**:
+#### API Endpoints Used / Kullanılan API Endpoint'leri:
 ```python
 youtube.playlistItems().list(
     part='snippet,contentDetails',
     playlistId=playlist_id,
-    maxResults=50
+    maxResults=50,
+    pageToken=next_page_token
 )
 ```
 
-**Dönen Veri**:
-- `videoId` - Video kimliği
-- `title` - Video başlığı
-- `snippet` - Video meta bilgileri
-- `contentDetails` - İçerik detayları
+**Returned Data / Dönen Veri**:
+- `videoId`: Video kimliği
+- `title`: Video başlığı
+- `snippet`: Video meta bilgileri
+- `contentDetails`: İçerik detayları
+- `publishedAt`: Yayınlanma tarihi
 
-**Veri Çıkarımı**: Video başlıkları ve URL'leri CSV oluşturma için kullanılır
+**Features / Özellikler**:
+- Fetch playlist information (playlist bilgilerini çekme)
+- Retrieve video metadata (video metadata'sını alma)
+- Pagination support with `nextPageToken`
+- Rate limiting awareness (quota yönetimi)
 
-**API Limitleri**:
-- Günlük quota: 10,000 birim (varsayılan)
-- playlistItems.list çağrısı: 1 birim
+**API Limits / API Limitleri**:
+- Daily quota: 10,000 units (günlük kota: 10,000 birim)
+- playlistItems.list call: 1 unit per request
+
+**Purpose / Amaç**: Initial data collection from YouTube playlists to create the video list CSV files.
+
+**Documentation**: [https://developers.google.com/youtube/v3](https://developers.google.com/youtube/v3)
 
 ---
 
-### B. YouTube Transcript API
+### 2. YouTube Transcript API
 
-**Amaç**: YouTube videolarından altyazı/transkript çıkarmak
-**Kütüphane**: `youtube_transcript_api` (YouTubeTranscriptApi)
+**Package**: `youtube-transcript-api`
+**Installation**: `pip install youtube-transcript-api`
+**GitHub**: [https://github.com/jdepoix/youtube-transcript-api](https://github.com/jdepoix/youtube-transcript-api)
 
-**Kullanım**:
+#### API Methods / API Metodları:
 ```python
 from youtube_transcript_api import YouTubeTranscriptApi
 
+# Get transcript with language preference
 transcript = YouTubeTranscriptApi.get_transcript(
     video_id,
-    languages=['tr', 'en']
+    languages=['tr', 'en']  # Turkish first, then English
 )
 ```
 
-**Çıktı**: Zaman damgalı metin transkriptleri
+**Output Format / Çıktı Formatı**:
+```python
+[
+    {
+        'text': 'Transcript text',
+        'start': 0.0,
+        'duration': 3.5
+    },
+    ...
+]
+```
 
-**Özellikler**:
-- Otomatik ve manuel altyazıları destekler
-- Çoklu dil desteği
-- Zaman damgası bilgisi içerir
+**Features / Özellikler**:
+- Extract video transcripts/captions (altyazı çıkarma)
+- Automatic language detection (otomatik dil tespiti)
+- Multi-language support: Turkish, English, etc. (çoklu dil desteği)
+- Fallback to auto-generated captions (otomatik altyazılara geri dönüş)
+- Text formatting support (metin formatlama)
+- Timestamp information (zaman damgası bilgisi)
 
-**Limitasyonlar**:
-- Tüm videolarda transkript bulunmayabilir
-- Bazı videolar transkript erişimini engelleyebilir
+**Limitations / Limitasyonlar**:
+- Not all videos have transcripts (tüm videolarda transkript bulunmayabilir)
+- Some videos block transcript access (bazı videolar erişimi engelleyebilir)
+- Auto-generated captions may have errors (otomatik altyazılar hatalı olabilir)
+
+**Purpose / Amaç**: Extract text transcripts from YouTube videos for content analysis.
 
 ---
 
-### C. OpenAI API
+### 3. OpenAI API
 
-**Amaç**: Video analizi, özetleme ve topic etiketleme
-**Versiyon**: OpenAI v1.0+ (ClientAPI uyumlu)
+**Package**: `openai>=1.0.0`
+**Models Used**: GPT-3.5-turbo / GPT-4 (configurable)
+**Authentication**: OpenAI API key required
 
-**Kullanım Alanları**:
+#### Use Cases / Kullanım Alanları:
 
-1. **Video İçeriği Analizi**
+**1. Video Summarization / Video Özetleme**:
 ```python
+from openai import OpenAI
+
 client = OpenAI(api_key=api_key)
 response = client.chat.completions.create(
     model="gpt-3.5-turbo",
     messages=[
-        {"role": "system", "content": "Video özetleyici"},
-        {"role": "user", "content": f"Özetle: {transcript}"}
-    ]
+        {"role": "system", "content": "You are a video summarizer."},
+        {"role": "user", "content": f"Summarize: {transcript}"}
+    ],
+    max_tokens=200,
+    temperature=0.5
 )
+summary = response.choices[0].message.content
 ```
 
-2. **Video Özetleri Oluşturma**
-- Transkriptlerden kısa özetler
-- Anahtar noktaları çıkarma
-- İçerik kategorilendirme
+**2. Sentiment Analysis / Duygu Analizi**:
+- Analyze emotional tone of content (içeriğin duygusal tonunu analiz etme)
+- Classify as positive/negative/neutral (pozitif/negatif/nötr sınıflandırma)
+- Extract key emotions (anahtar duyguları çıkarma)
 
-3. **Küme Etiketleme (LLM Labeling)**
+**3. Theme Extraction / Tema Çıkarma**:
+- Identify main topics and themes (ana konuları ve temaları belirleme)
+- Categorize content (içerik kategorilendirme)
+- Extract key points (anahtar noktaları çıkarma)
+
+**4. Cluster Labeling (LLM-based) / Küme Etiketleme**:
 ```python
-# Her kümeden örnek metinler
-sample_texts = [cluster_samples...]
+# Sample texts from each cluster
+sample_texts = cluster_df.sample(5)['transcript'].tolist()
 
-# LLM ile etiket oluşturma
+# Generate cluster label with LLM
 prompt = f"""
-Aşağıdaki video özetlerine dayanarak bu grubun ana temasını
-2-3 kelime ile tanımla:
-{sample_texts}
+Based on the following video summaries, define the main theme
+of this group in 2-3 words:
+
+{chr(10).join(sample_texts)}
+
+Label (only 2-3 words):
 """
 label = get_llm_response(prompt)
 ```
 
-4. **Dil Çevirisi (Yardımcı)**
-- Özetlerin İngilizce çevirisi
-- Çok dilli içerik normalizasyonu
+**API Parameters / API Parametreleri**:
+- `model`: "gpt-3.5-turbo" or "gpt-4"
+- `max_tokens`: 200-2000 (depending on task)
+- `temperature`: 0.3-0.7 (lower = more consistent)
+- `top_p`: 1.0 (nucleus sampling)
 
-**API Parametreleri**:
-- Model: `gpt-3.5-turbo` veya `gpt-4`
-- Maksimum token: 2000-4000
-- Temperature: 0.3-0.7 (özetleme için)
+**Purpose / Amaç**: AI-powered content analysis and enhancement of clustering results.
 
 ---
 
-### D. Google Translate / Deep Translator
+### 4. Translation API
 
-**Amaç**: Video transkriptlerini ve özetlerini çevirmek
+**Package**: `deep-translator` (preferred) / `googletrans` (fallback)
+**Installation**:
+```bash
+pip install deep-translator
+pip install googletrans==4.0.0rc1
+```
 
-**Kullanılan Kütüphaneler**:
-
-1. **Deep Translator** (Tercih edilen):
+#### Deep Translator (Preferred / Tercih Edilen):
 ```python
 from deep_translator import GoogleTranslator
 
 translator = GoogleTranslator(source='tr', target='en')
-translated = translator.translate(text)
+translated_text = translator.translate(text)
 ```
 
-2. **Googletrans** (Yedek):
+#### Googletrans (Fallback / Yedek):
 ```python
 from googletrans import Translator
 
 translator = Translator()
 result = translator.translate(text, src='tr', dest='en')
+translated_text = result.text
 ```
 
-**Desteklenen Diller**:
-- Türkçe → İngilizce
-- İngilizce → Türkçe
-- Otomatik dil tespiti
+**Supported Languages / Desteklenen Diller**:
+- Turkish ↔ English (Türkçe ↔ İngilizce)
+- Automatic language detection (otomatik dil tespiti)
+- 100+ languages supported
 
-**Kullanım Senaryoları**:
-- Türkçe transkriptleri İngilizce'ye çevirme
-- Çok dilli kümeleme için veri normalizasyonu
-- Özet metinlerini standart dile çevirme
+**Usage Scenarios / Kullanım Senaryoları**:
+- Translate Turkish transcripts to English (Türkçe transkriptleri İngilizce'ye çevirme)
+- Multi-language normalization for clustering (kümeleme için çok dilli normalizasyon)
+- Standardize summary texts (özet metinlerini standartlaştırma)
+
+**Purpose / Amaç**: Enable multi-language analysis and ensure compatibility with English-based NLP models.
 
 ---
 
-## Veri Yükleme ve Ön İşleme
+## Output Datasets / Çıktı Veri Setleri
 
-### Aşama 1: Playlist Veri Toplama
+### 1. Analyzed Video CSV Files
 
-```python
-# Adım 1: YouTube API ile playlist videolarını çek
-playlist_id = "PLnAF4npbrTwzO2W6v07ktEjBU6885k5hB"  # Örnek
-api_key = os.getenv("YOUTUBE_API_KEY")
-videos = get_all_playlist_videos(playlist_id, api_key)
-# Döner: Liste [{'title': '...', 'url': '...'}, ...]
+#### Files / Dosyalar:
+- `analyzed_storybox_videos.csv` - First version of analyzed results
+  - İlk versiyon analiz sonuçları
 
-# Adım 2: Encoding işleme ile CSV'ye kaydet
-# Türkçe karakterler için birden fazla encoding
-save_to_csv_multiple_encodings(videos, base_filename="storybox_videos")
+- `analyzed_storybox_videos_v2.csv` - Improved version with enhanced analysis
+  - İyileştirilmiş analiz ile gelişmiş versiyon
+
+- `temp_analyzed_*.csv` - Temporary checkpoint files during processing
+  - İşlem sırasında oluşturulan geçici checkpoint dosyaları
+
+#### Output Structure / Çıktı Yapısı:
+```csv
+title,url,video_id,transcript,summary,sentiment,theme,analysis_date,status
 ```
 
-**Çıktı Dosyaları**:
-- UTF-8 BOM: Excel'de doğrudan açılabilir
-- UTF-8: Genel programlama kullanımı
-- Windows-1254: Eski Windows sistemleri için
+**Fields / Alanlar**:
+- `title`: Original video title (orijinal video başlığı)
+- `url`: YouTube video URL
+- `video_id`: YouTube video identifier
+- `transcript`: Full transcript text (tam transkript metni)
+- `transcript_en`: English transcript (optional)
+- `summary`: AI-generated summary (AI tarafından oluşturulan özet)
+- `summary_en`: English summary (optional)
+- `sentiment`: Sentiment score or category (duygu skoru veya kategorisi)
+  - Values: "Positive", "Negative", "Neutral"
+- `theme`: Identified theme/category (belirlenen tema/kategori)
+- `analysis_date`: Processing timestamp (işlem zaman damgası)
+- `status`: Processing status (işlem durumu)
+  - Values: "Success", "Error", "No Transcript"
+
+**Encoding**: UTF-8 with BOM (`utf-8-sig`) for Excel compatibility
+
+**Purpose / Amaç**: Store analyzed video data with transcripts, summaries, and AI-generated insights.
 
 ---
 
-### Aşama 2: Video Analizi
+### 2. Clustering Analysis Results (Excel)
 
+#### K-Means Clustering Files:
+- `kmeans_labeled_llm.xlsx` - Default K-Means clustering (4 clusters)
+- `kmeans_3_labeled_llm.xlsx` - K-Means with 3 clusters
+- `kmeans_4_labeled_llm.xlsx` - K-Means with 4 clusters
+- `kmeans_5_labeled_llm.xlsx` - K-Means with 5 clusters
+- `kmeans_labeled_llm_improved.xlsx` - Enhanced version with improved labeling
+
+#### HDBSCAN Clustering Files:
+- `hdbscan_min3_labeled_llm.xlsx` - HDBSCAN with min_cluster_size=3
+- `hdbscan_min5_labeled_llm.xlsx` - HDBSCAN with min_cluster_size=5
+- `hdbscan_min7_labeled_llm.xlsx` - HDBSCAN with min_cluster_size=7
+
+#### SOM (Self-Organizing Maps) Files:
+- `som_4_labeled_llm.xlsx` - SOM with ~4 clusters (2×2 grid)
+- `som_6_labeled_llm.xlsx` - SOM with ~6 clusters (2×3 grid)
+- `som_9_labeled_llm.xlsx` - SOM with ~9 clusters (3×3 grid)
+
+#### Output Structure / Çıktı Yapısı:
+
+**Common Columns / Ortak Sütunlar**:
+- Original transcript data (orijinal transkript verisi)
+- `cluster`: Cluster assignment (küme ataması) - numeric ID
+- `cluster_label`: LLM-generated cluster name (LLM tarafından oluşturulan küme adı)
+- `cluster_theme`: Detailed theme description (detaylı tema açıklaması)
+- `keywords`: Representative keywords for the cluster (küme için temsili anahtar kelimeler)
+- `umap_x`, `umap_y`: 2D coordinates for visualization (görselleştirme için 2D koordinatlar)
+
+**Method-Specific Columns / Metoda Özel Sütunlar**:
+
+**K-Means**:
+- `silhouette_score`: Clustering quality metric (file-level)
+- `inertia`: Within-cluster sum of squares
+
+**HDBSCAN**:
+- `outlier_score`: Noise/outlier score (gürültü skoru)
+- `cluster == -1`: Noise points (gürültü noktaları)
+- `probabilities`: Cluster membership probabilities
+
+**SOM**:
+- `som_x`, `som_y`: Grid coordinates (grid koordinatları)
+- `winner_neuron`: Winning neuron ID (kazanan nöron kimliği)
+
+**Purpose / Amaç**: Store clustering results with LLM-generated labels and quality metrics for analysis and visualization.
+
+---
+
+## Data Processing Pipeline / Veri İşleme Süreci
+
+### Stage 1: Data Collection / Veri Toplama
+
+```
+YouTube Playlist
+    ↓ (YouTube Data API v3)
+CSV Export (multiple encodings)
+    ├── storybox_videos_utf8_bom.csv (Primary)
+    ├── storybox_videos_utf8.csv
+    ├── storybox_videos_win1254.csv
+    └── storybox_videos_manual.csv
+```
+
+**Process / Süreç**:
+1. Connect to YouTube Data API (YouTube Data API'ye bağlan)
+2. Fetch playlist items with pagination (sayfalandırma ile playlist öğelerini çek)
+3. Extract video metadata: title, ID, URL (video metadata'sını çıkar)
+4. Export to CSV with multiple encoding formats (çoklu encoding formatıyla CSV'ye aktar)
+5. Turkish character handling and validation (Türkçe karakter işleme ve doğrulama)
+
+**Code Example / Kod Örneği**:
 ```python
-# Giriş: CSV dosyası (storybox_videos_utf8_bom.csv)
-df = pd.read_csv(csv_file, encoding='utf-8-sig')
+from googleapiclient.discovery import build
+import csv
 
-# Her video URL'si için:
+API_KEY = os.getenv("YOUTUBE_API_KEY")
+youtube = build('youtube', 'v3', developerKey=API_KEY)
+
+videos = []
+next_page_token = None
+
+while True:
+    request = youtube.playlistItems().list(
+        part='snippet',
+        playlistId=playlist_id,
+        maxResults=50,
+        pageToken=next_page_token
+    )
+    response = request.execute()
+
+    for item in response['items']:
+        video_id = item['snippet']['resourceId']['videoId']
+        title = item['snippet']['title']
+        videos.append({
+            'title': title,
+            'url': f'https://www.youtube.com/watch?v={video_id}'
+        })
+
+    next_page_token = response.get('nextPageToken')
+    if not next_page_token:
+        break
+
+# Save with UTF-8 BOM for Excel
+with open('storybox_videos_utf8_bom.csv', 'w', newline='', encoding='utf-8-sig') as f:
+    writer = csv.DictWriter(f, fieldnames=['title', 'url'])
+    writer.writeheader()
+    writer.writerows(videos)
+```
+
+---
+
+### Stage 2: Transcript Extraction & Analysis / Transkript Çıkarma ve Analiz
+
+```
+Video URLs
+    ↓ (YouTube Transcript API)
+Raw Transcripts
+    ↓ (Text Cleaning & Preprocessing)
+Cleaned Transcripts
+    ↓ (OpenAI API - Optional)
+Analyzed Content (Summary, Sentiment, Theme)
+    ↓
+analyzed_storybox_videos.csv
+```
+
+**Process / Süreç**:
+1. Read video list from CSV (CSV'den video listesini oku)
+2. For each video:
+   - Extract transcript using YouTube Transcript API (transkripti çıkar)
+   - Try languages: Turkish → English → Auto-generated (dilleri dene)
+   - Clean and normalize text (metni temizle ve normalize et)
+   - (Optional) Generate AI summary (AI özet oluştur)
+   - (Optional) Perform sentiment analysis (duygu analizi yap)
+   - (Optional) Extract themes (temaları çıkar)
+3. Save results with checkpointing (resumable) (checkpoint ile kaydet)
+4. Export to analyzed CSV (analiz edilmiş CSV'ye aktar)
+
+**Error Handling / Hata Yönetimi**:
+- No transcript available: `status = "No Transcript"`
+- API error: `status = "Error"`
+- Successful: `status = "Success"`
+
+**Code Example / Kod Örneği**:
+```python
+from youtube_transcript_api import YouTubeTranscriptApi
+import pandas as pd
+
+df = pd.read_csv('storybox_videos_utf8_bom.csv', encoding='utf-8-sig')
+results = []
+
 for index, row in df.iterrows():
     video_url = row['url']
+    video_id = video_url.split('v=')[1]
 
-    # 1. Transkript çıkar
-    transcript = extract_transcript(video_url)
+    try:
+        # Extract transcript
+        transcript_data = YouTubeTranscriptApi.get_transcript(
+            video_id,
+            languages=['tr', 'en']
+        )
+        transcript = ' '.join([item['text'] for item in transcript_data])
 
-    # 2. OpenAI ile özetle
-    summary = summarize_with_openai(transcript)
+        # Optional: Summarize with OpenAI
+        summary = summarize_with_openai(transcript)
 
-    # 3. Google Translate ile çevir
-    summary_en = translate_to_english(summary)
-    transcript_en = translate_to_english(transcript)
+        results.append({
+            'title': row['title'],
+            'url': video_url,
+            'transcript': transcript,
+            'summary': summary,
+            'status': 'Success'
+        })
+    except Exception as e:
+        results.append({
+            'title': row['title'],
+            'url': video_url,
+            'status': f'Error: {str(e)}'
+        })
 
-    # 4. Sonuçları kaydet
-    save_to_csv(analyzed_data)
-```
+    # Save checkpoint every 10 videos
+    if (index + 1) % 10 == 0:
+        temp_df = pd.DataFrame(results)
+        temp_df.to_csv('temp_analyzed.csv', encoding='utf-8-sig', index=False)
 
-**Çıktı**: `analyzed_storybox_videos.csv` veya `v2` versiyonu
-
-**Hata Yönetimi**:
-- Transkript bulunamazsa: `Status = "No Transcript"`
-- API hatası: `Status = "Error"`
-- Başarılı: `Status = "Success"`
-
----
-
-### Aşama 3: Transkript Verisi Yükleme
-
-```python
-# Excel dosyasını yükle
-df = pd.read_excel("Helsinki_Opus_Transcript.xlsx")
-
-# Gerekli sütunları doğrula
-required_columns = ["Video URL", "Transcript", "Summary"]
-validate_columns(df, required_columns)
-
-# Büyük/küçük harf duyarlılığı ve sütun eşleştirme
-df.columns = df.columns.str.strip()
-```
-
-**Metin Ön İşleme**:
-```python
-# Küçük harfe çevir
-df['text'] = df['text'].str.lower()
-
-# Fazla boşlukları temizle
-df['text'] = df['text'].str.replace(r'\s+', ' ', regex=True)
-
-# Başında/sonundaki boşlukları sil
-df['text'] = df['text'].str.strip()
-
-# Özel karakterleri encoding ile işle
-# UTF-8 encoding garantisi
+# Final save
+final_df = pd.DataFrame(results)
+final_df.to_csv('analyzed_storybox_videos.csv', encoding='utf-8-sig', index=False)
 ```
 
 ---
 
-### Aşama 4: Metin Embedding ve Vektörleştirme
+### Stage 3: Feature Engineering / Özellik Mühendisliği
 
-#### Sentence Embedding
+```
+Transcripts
+    ↓ (Sentence-BERT)
+Text Embeddings (384-dimensional)
+    ↓ (UMAP)
+Reduced Embeddings (2-dimensional)
+    ↓ (Clustering Algorithm)
+Cluster Assignments
+```
+
+#### 1. Text Embeddings / Metin Gömme
+**Model**: `all-MiniLM-L6-v2` (Sentence-BERT)
+**Embedding Dimension**: 384
+**Purpose**: Convert text to numerical vectors (metni sayısal vektörlere dönüştür)
+
 ```python
 from sentence_transformers import SentenceTransformer
 
-# Model yükle
 model = SentenceTransformer('all-MiniLM-L6-v2')
-
-# Metinleri vektörlere dönüştür
 embeddings = model.encode(
     texts,
     show_progress_bar=True,
-    batch_size=32
+    batch_size=32,
+    normalize_embeddings=True
 )
-# Çıktı: numpy array (n_samples, 384)
+# Output: numpy array (n_samples, 384)
 ```
 
-**Model Detayları**:
-- Model: all-MiniLM-L6-v2
-- Embedding boyutu: 384
-- Dil: Çok dilli (İngilizce ağırlıklı)
-- Performans: Hızlı ve hafif
-
-#### Keyword Çıkarma
-
-**İngilizce için**:
-```python
-from sklearn.feature_extraction.text import CountVectorizer
-
-vectorizer = CountVectorizer(
-    stop_words='english',
-    max_features=50,
-    ngram_range=(1, 2)  # unigram ve bigram
-)
-keyword_matrix = vectorizer.fit_transform(texts)
-```
-
-**Türkçe için**:
-```python
-from sklearn.feature_extraction.text import TfidfVectorizer
-
-TURKISH_STOPWORDS = {
-    've', 'bir', 'bu', 'da', 'de', 'ile', 'için',
-    'gibi', 'olarak', 'sonra', 'önce', 'yılında',
-    'artık', 'çok', 'tüm', 'her', 'ise', 'daha',
-    'ben', 'sen', 'o', 'biz', 'siz', 'onlar',
-    'şu', 'şey', 'var', 'yok', 'mi', 'mu', 'mü'
-}
-
-vectorizer = TfidfVectorizer(
-    stop_words=list(TURKISH_STOPWORDS),
-    max_features=100,
-    ngram_range=(1, 2),
-    min_df=2  # En az 2 dokümanda geçmeli
-)
-```
-
----
-
-### Aşama 5: Boyut İndirgeme (UMAP)
+#### 2. Dimensionality Reduction / Boyut İndirgeme
+**Algorithm**: UMAP (Uniform Manifold Approximation and Projection)
+**Output Dimensions**: 2 (for visualization / görselleştirme için)
+**Parameters**: `n_components=2`, `random_state=42`
 
 ```python
 import umap
 
-# UMAP reducer
 reducer = umap.UMAP(
-    n_components=2,      # 2D görselleştirme için
-    n_neighbors=15,      # Yerel komşuluk
-    min_dist=0.1,        # Minimum nokta mesafesi
-    metric='cosine',     # Cosine similarity
-    random_state=42      # Tekrarlanabilirlik
+    n_components=2,
+    n_neighbors=15,
+    min_dist=0.1,
+    metric='cosine',
+    random_state=42
 )
-
-# Boyut indirgeme
 reduced_embeddings = reducer.fit_transform(embeddings)
-# Çıktı: numpy array (n_samples, 2)
+# Output: numpy array (n_samples, 2)
 ```
 
-**UMAP Parametreleri**:
-- `n_neighbors`: Küçük değer → detaylı yapı, Büyük değer → genel yapı
-- `min_dist`: Küçük değer → sıkı kümeler, Büyük değer → dağılmış kümeler
-- `metric`: 'cosine', 'euclidean', 'manhattan'
+#### 3. Text Preprocessing / Metin Ön İşleme
+
+**Stopword Removal / Stopword Çıkarma**:
+```python
+TURKISH_STOPWORDS = {
+    've', 'bir', 'bu', 'da', 'de', 'ile', 'için', 'gibi', 'olarak',
+    'sonra', 'önce', 'yılında', 'artık', 'çok', 'tüm', 'her', 'ise',
+    'daha', 'ben', 'sen', 'o', 'biz', 'siz', 'onlar', 'şu', 'şey',
+    'var', 'yok', 'mi', 'mu', 'mü', 'den', 'dan', 'ten', 'tan'
+}
+```
+
+**Text Normalization / Metin Normalizasyonu**:
+- Lowercase conversion (küçük harfe çevirme)
+- Whitespace trimming (boşluk temizleme)
+- Special character handling (özel karakter işleme)
+
+**TF-IDF Vectorization / TF-IDF Vektörleştirme**:
+```python
+from sklearn.feature_extraction.text import TfidfVectorizer
+
+vectorizer = TfidfVectorizer(
+    stop_words=list(TURKISH_STOPWORDS),
+    max_features=100,
+    ngram_range=(1, 2),  # unigram and bigram
+    min_df=2  # Must appear in at least 2 documents
+)
+```
 
 ---
 
-### Aşama 6: Kümeleme
+### Stage 4: Clustering Analysis / Kümeleme Analizi
+
+```
+Reduced Embeddings
+    ↓ (Clustering)
+    ├── K-Means (3, 4, 5 clusters)
+    ├── HDBSCAN (min_size: 3, 5, 7)
+    └── SOM (4, 6, 9 clusters)
+    ↓ (Cluster Quality Evaluation)
+Silhouette Scores
+    ↓ (LLM-based Labeling)
+Cluster Labels & Themes
+    ↓ (Visualization)
+UMAP Scatter Plots
+    ↓ (Export)
+Excel Files (.xlsx)
+```
 
 #### 1. K-Means Clustering
+
+**Algorithm**: Lloyd's algorithm
+**Parameters**:
+- `n_clusters`: 3, 4, 5 (test different values)
+- `random_state`: 42 (reproducibility)
+- `n_init`: 'auto' (automatic initialization runs)
+- `max_iter`: 300
 
 ```python
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 
-# Farklı küme sayıları test et
 for n_clusters in [3, 4, 5]:
     kmeans = KMeans(
         n_clusters=n_clusters,
         random_state=42,
-        n_init=10,
+        n_init='auto',
         max_iter=300
     )
+    clusters = kmeans.fit_predict(reduced_embeddings)
 
-    clusters = kmeans.fit_predict(embeddings)
-
-    # Kalite metriği
-    silhouette_avg = silhouette_score(embeddings, clusters)
+    # Quality metric
+    silhouette_avg = silhouette_score(reduced_embeddings, clusters)
     print(f"K={n_clusters}, Silhouette: {silhouette_avg:.3f}")
 ```
 
-**Çıktı Dosyası**: `kmeans_{n_clusters}_labeled_llm.xlsx`
+**Pros / Avantajlar**:
+- Fast and scalable (hızlı ve ölçeklenebilir)
+- Easy to interpret (yorumlaması kolay)
+- Deterministic (random_state ile)
 
-**Avantajlar**:
-- Hızlı ve basit
-- Küme sayısını belirleyebilme
-- Yorumlanması kolay
-
-**Dezavantajlar**:
-- Küre şeklinde kümeler varsayar
-- Küme sayısını önceden belirlemek gerekir
-
----
+**Cons / Dezavantajlar**:
+- Assumes spherical clusters (küre şeklinde kümeler varsayar)
+- Requires specifying k (küme sayısını belirtmek gerekir)
 
 #### 2. HDBSCAN (Hierarchical Density-Based Clustering)
+
+**Algorithm**: Density-based hierarchical clustering
+**Parameters**:
+- `min_cluster_size`: 3, 5, 7 (minimum cluster size)
+- `min_samples`: 1 (minimum core points)
+- `metric`: 'euclidean'
+- `cluster_selection_method`: 'eom' (Excess of Mass)
 
 ```python
 import hdbscan
 
-# Farklı minimum küme büyüklükleri test et
 for min_size in [3, 5, 7]:
     clusterer = hdbscan.HDBSCAN(
         min_cluster_size=min_size,
         min_samples=1,
         metric='euclidean',
-        cluster_selection_method='eom'
+        cluster_selection_method='eom',
+        gen_min_span_tree=True
     )
+    clusters = clusterer.fit_predict(reduced_embeddings)
 
-    clusters = clusterer.fit_predict(embeddings)
-
-    # Gürültü noktaları: label = -1
+    # Count clusters and noise
     n_clusters = len(set(clusters)) - (1 if -1 in clusters else 0)
     n_noise = list(clusters).count(-1)
-
     print(f"Min size={min_size}, Clusters={n_clusters}, Noise={n_noise}")
 ```
 
-**Çıktı Dosyası**: `hdbscan_min{size}_labeled_llm.xlsx`
+**Pros / Avantajlar**:
+- Automatically determines cluster count (küme sayısını otomatik belirler)
+- Detects noise/outliers (gürültü/outlier tespit eder)
+- Handles arbitrary-shaped clusters (farklı şekillerdeki kümeleri bulabilir)
 
-**Avantajlar**:
-- Küme sayısını otomatik belirler
-- Gürültüyü (outlier) tespit eder
-- Farklı yoğunluktaki kümeleri bulabilir
+**Cons / Dezavantajlar**:
+- Sensitive to parameters (parametrelere duyarlı)
+- Computationally expensive for large datasets (büyük veri setlerinde yavaş)
 
-**Dezavantajlar**:
-- Parametrelere duyarlı
-- Küçük veri setlerinde zayıf performans
+#### 3. SOM (Self-Organizing Maps)
 
----
-
-#### 3. Self-Organizing Maps (SOM)
+**Algorithm**: Kohonen network
+**Grid Sizes**: Calculated to approximate desired cluster count
+- 4 clusters → 2×2 grid
+- 6 clusters → 2×3 grid
+- 9 clusters → 3×3 grid
 
 ```python
 from minisom import MiniSom
+import numpy as np
 
-# Farklı grid boyutları test et
-configs = [
-    (2, 2, 4),   # 2x2 grid, 4 küme
-    (3, 2, 6),   # 3x2 grid, 6 küme
-    (3, 3, 9)    # 3x3 grid, 9 küme
-]
+# For 4 clusters (2x2 grid)
+som = MiniSom(
+    x=2,
+    y=2,
+    input_len=2,  # UMAP reduced to 2D
+    sigma=0.5,
+    learning_rate=0.5,
+    neighborhood_function='gaussian',
+    random_seed=42
+)
 
-for x_dim, y_dim, n_clusters in configs:
-    som = MiniSom(
-        x=x_dim,
-        y=y_dim,
-        input_len=embedding_dim,
-        sigma=1.0,
-        learning_rate=0.5,
-        neighborhood_function='gaussian',
-        random_seed=42
-    )
+# Train
+som.train_random(reduced_embeddings, 100)
 
-    # Eğitim
-    som.train_random(embeddings, num_iteration=1000)
-
-    # Küme ataması
-    clusters = []
-    for emb in embeddings:
-        winner = som.winner(emb)
-        cluster_id = winner[0] * y_dim + winner[1]
-        clusters.append(cluster_id)
+# Get cluster assignments
+clusters = []
+for emb in reduced_embeddings:
+    winner = som.winner(emb)
+    cluster_id = winner[0] * 2 + winner[1]
+    clusters.append(cluster_id)
 ```
 
-**Çıktı Dosyası**: `som_{n_clusters}_labeled_llm.xlsx`
+**Pros / Avantajlar**:
+- Preserves topological relationships (topolojik yapıyı korur)
+- Visual representation (görsel temsil)
+- Dimensionality reduction + clustering combined
 
-**Avantajlar**:
-- Topolojik yapı korur
-- Görselleştirmesi kolay
-- Boyut indirgeme + kümeleme birlikte
+**Cons / Dezavantajlar**:
+- Grid size selection critical (grid boyutu seçimi kritik)
+- Training can be slow (eğitim yavaş olabilir)
 
-**Dezavantajlar**:
-- Grid boyutu seçimi kritik
-- Eğitim süresi uzun olabilir
+**Quality Metrics / Kalite Metrikleri**:
+- **Silhouette Score**: Measures cluster cohesion and separation (-1 to 1, higher is better)
+- Visual inspection: UMAP scatter plots with cluster colors
 
 ---
 
-### Aşama 7: LLM ile Küme Etiketleme
+### Stage 5: Theme Labeling & Interpretation / Tema Etiketleme ve Yorumlama
 
+```
+Cluster Members (Transcripts)
+    ↓ (Keyword Extraction)
+Representative Keywords (TF-IDF)
+    ↓ (LLM Prompting)
+    ├── Flan-T5 Base
+    └── Summarization Pipeline
+    ↓
+Cluster Labels & Descriptions
+    ↓ (Add to DataFrame)
+Final Labeled Results
+    ↓ (Export)
+Excel Files
+```
+
+**LLM Models Used / Kullanılan LLM Modelleri**:
+- **Flan-T5 Base**: `google/flan-t5-base`
+- **Task**: Text-to-text generation for cluster naming
+- **Alternative**: Summarization pipeline for concise titles
+
+**Labeling Process / Etiketleme Süreci**:
+1. Extract representative documents from each cluster (her kümeden temsili dökümanları çıkar)
+2. Generate keywords using TF-IDF or CountVectorizer (TF-IDF ile anahtar kelimeler oluştur)
+3. Prompt LLM with cluster keywords and sample texts (LLM'e anahtar kelimeler ve örnek metinlerle prompt gönder)
+4. Generate concise, descriptive cluster labels (kısa ve açıklayıcı küme etiketleri oluştur)
+5. Add labels to output DataFrame (etiketleri DataFrame'e ekle)
+
+**Code Example / Kod Örneği**:
 ```python
-def label_clusters_with_llm(df, cluster_column, text_column, n_samples=5):
-    """Her küme için LLM ile anlamlı etiket oluştur"""
+from transformers import pipeline
+
+def label_clusters_with_llm(df, cluster_column='cluster', text_column='transcript', n_samples=5):
+    """Generate LLM labels for each cluster"""
+
+    # Initialize text generation pipeline
+    text2text = pipeline("text2text-generation", model="google/flan-t5-base")
 
     cluster_labels = {}
 
     for cluster_id in df[cluster_column].unique():
-        # Her kümeden örnek metinler
+        if cluster_id == -1:  # Skip noise in HDBSCAN
+            cluster_labels[cluster_id] = "Noise/Outliers"
+            continue
+
+        # Sample texts from cluster
         cluster_texts = df[df[cluster_column] == cluster_id][text_column]
         samples = cluster_texts.sample(min(n_samples, len(cluster_texts)))
 
-        # LLM'e gönder
+        # Create prompt
         prompt = f"""
-        Aşağıdaki video özetleri aynı temalı bir gruptan geliyor.
-        Bu grubun ana temasını 2-3 kelime ile özetle:
+        Summarize the main theme of these video transcripts in 2-3 words:
 
-        {chr(10).join(samples.tolist())}
+        {chr(10).join(samples.tolist()[:3])}
 
-        Etiket (sadece 2-3 kelime):
+        Theme:
         """
 
-        label = get_openai_response(prompt)
+        # Generate label
+        result = text2text(prompt, max_length=20, num_return_sequences=1)
+        label = result[0]['generated_text'].strip()
         cluster_labels[cluster_id] = label
 
-    # Etiketleri DataFrame'e ekle
-    df['Cluster_Label'] = df[cluster_column].map(cluster_labels)
+    # Add labels to dataframe
+    df['cluster_label'] = df[cluster_column].map(cluster_labels)
 
     return df
 ```
 
-**Örnek Etiketler**:
-- Küme 0: "Eğitim ve Öğretim"
-- Küme 1: "Teknoloji Haberleri"
-- Küme 2: "Sağlık ve Yaşam"
-- Küme 3: "Müzik ve Sanat"
+**Example Labels / Örnek Etiketler**:
+- Cluster 0: "Education & Teaching" / "Eğitim ve Öğretim"
+- Cluster 1: "Technology News" / "Teknoloji Haberleri"
+- Cluster 2: "Health & Lifestyle" / "Sağlık ve Yaşam"
+- Cluster 3: "Music & Arts" / "Müzik ve Sanat"
 
 ---
 
-## Çıktı Veri Dosyaları
+## Machine Learning Models / Makine Öğrenmesi Modelleri
 
-### CSV Dosyaları
+### Pre-trained Models / Önceden Eğitilmiş Modeller
 
-#### 1. Playlist CSV'leri
-```
-storybox_videos_utf8_bom.csv
-├── Sütunlar: title, url
-├── Encoding: UTF-8 with BOM
-└── Kullanım: Excel'de direkt açılabilir
-```
+#### 1. Sentence-BERT: `all-MiniLM-L6-v2`
 
-#### 2. Analiz Sonuçları
-```
-analyzed_storybox_videos.csv
-├── Video_URL: YouTube video linki
-├── Video_Title: Video başlığı
-├── Transcript: Tam transkript metni
-├── Summary: Video özeti
-├── Summary_English: İngilizce özet
-├── Transcript_English: İngilizce transkript
-└── Status: İşlem durumu (Success/Error/No Transcript)
-```
+**Type / Tip**: Sentence embedding model
+**Architecture / Mimari**: MiniLM (distilled from BERT)
+**Embedding Size / Gömme Boyutu**: 384 dimensions
+**Training**: Sentence similarity on large corpus
+**Performance**: ~3000 sentences/second on CPU
 
-```
-analyzed_storybox_videos_v2.csv
-└── Geliştirilmiş versiyon (ek alanlar ve iyileştirilmiş özetler)
-```
+**Use Case / Kullanım Alanı**: Convert transcripts to semantic vectors
+
+**Pros / Avantajlar**:
+- Fast inference (hızlı çıkarım)
+- Pre-trained, no fine-tuning needed (önceden eğitilmiş)
+- High-quality embeddings (yüksek kaliteli gömme)
+- Multilingual support (çok dilli destek)
+
+**Limitations / Limitasyonlar**:
+- Not optimized for Turkish (Türkçe için optimize edilmemiş)
+- Maximum token length: 256
+- English-focused training
+
+**Model Card**: [https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2)
 
 ---
 
-### Excel Dosyaları
+#### 2. Flan-T5 Base: `google/flan-t5-base`
 
-#### 1. K-Means Sonuçları
-```
-kmeans_labeled_llm.xlsx
-kmeans_3_labeled_llm.xlsx
-kmeans_4_labeled_llm.xlsx
-kmeans_5_labeled_llm.xlsx
-```
+**Type / Tip**: Text-to-text transformer
+**Architecture / Mimari**: T5 (Text-to-Text Transfer Transformer)
+**Parameters / Parametre Sayısı**: ~250M
+**Training**: Instruction fine-tuning on FLAN tasks
 
-**Sütunlar**:
-- Video URL
-- Transcript / Summary
-- Cluster (küme numarası)
-- Cluster_Label (LLM etiketi)
-- X_umap, Y_umap (görselleştirme koordinatları)
+**Use Case / Kullanım Alanı**: Cluster labeling, text generation, summarization
 
----
+**Features / Özellikler**:
+- Zero-shot task understanding (sıfır-atış görev anlama)
+- Instruction-following capabilities (talimat takip etme)
+- Versatile for various NLP tasks
 
-#### 2. HDBSCAN Sonuçları
-```
-hdbscan_min3_labeled_llm.xlsx
-hdbscan_min5_labeled_llm.xlsx
-hdbscan_min7_labeled_llm.xlsx
-```
-
-**Sütunlar**:
-- Video URL
-- Transcript / Summary
-- Cluster (küme numarası, -1 = gürültü)
-- Cluster_Label (LLM etiketi)
-- Outlier_Score (gürültü skoru)
+**Model Card**: [https://huggingface.co/google/flan-t5-base](https://huggingface.co/google/flan-t5-base)
 
 ---
 
-#### 3. SOM Sonuçları
-```
-som_4_labeled_llm.xlsx
-som_6_labeled_llm.xlsx
-som_9_labeled_llm.xlsx
-```
+### Unsupervised Learning Algorithms / Denetimsiz Öğrenme Algoritmaları
 
-**Sütunlar**:
-- Video URL
-- Transcript / Summary
-- Cluster (küme numarası)
-- Cluster_Label (LLM etiketi)
-- SOM_X, SOM_Y (grid koordinatları)
+#### K-Means
+- **Type**: Centroid-based clustering
+- **Complexity**: O(n × k × i × d)
+- **Pros**: Fast, scalable, interpretable
+- **Cons**: Assumes spherical clusters, requires k specification
+- **Implementation**: `sklearn.cluster.KMeans`
+
+#### HDBSCAN
+- **Type**: Density-based hierarchical clustering
+- **Complexity**: O(n²) worst case
+- **Pros**: No cluster count needed, handles noise, arbitrary shapes
+- **Cons**: Sensitive to parameters
+- **Implementation**: `hdbscan.HDBSCAN`
+
+#### SOM
+- **Type**: Neural network-based clustering
+- **Topology**: 2D grid
+- **Pros**: Preserves topological relationships, visual
+- **Cons**: Grid size affects cluster count
+- **Implementation**: `minisom.MiniSom`
+
+#### UMAP
+- **Type**: Manifold learning for dimensionality reduction
+- **Purpose**: Reduce 384D embeddings to 2D for visualization
+- **Pros**: Preserves local and global structure
+- **Implementation**: `umap.UMAP`
 
 ---
 
-#### 4. İyileştirilmiş Sonuçlar
-```
-kmeans_labeled_llm_improved.xlsx
+## Dependencies & Requirements / Bağımlılıklar ve Gereksinimler
+
+### Python Packages / Python Paketleri
+
+#### Core Data Processing / Temel Veri İşleme:
+```bash
+pip install pandas numpy openpyxl
 ```
 
-**Ek Özellikler**:
-- Daha detaylı LLM etiketleri
-- Küme kalite metrikleri
-- Anahtar kelimeler (keywords)
-- Küme özet istatistikleri
+#### YouTube APIs:
+```bash
+pip install google-api-python-client youtube-transcript-api
+```
+
+#### Machine Learning & NLP:
+```bash
+pip install sentence-transformers transformers torch
+pip install scikit-learn umap-learn hdbscan minisom
+```
+
+#### OpenAI & Translation:
+```bash
+pip install openai>=1.0.0
+pip install deep-translator
+```
+
+#### Visualization / Görselleştirme:
+```bash
+pip install matplotlib seaborn
+```
+
+#### Full Installation Command / Tam Kurulum Komutu:
+```bash
+pip install pandas numpy openpyxl google-api-python-client \
+    youtube-transcript-api sentence-transformers transformers torch \
+    scikit-learn umap-learn hdbscan minisom openai deep-translator \
+    matplotlib seaborn
+```
+
+### Package Versions / Paket Versiyonları
+
+| Package | Version / Versiyon | Purpose / Amaç |
+|---------|-------------------|---------------|
+| `pandas` | ≥2.0.0 | DataFrame operations |
+| `numpy` | ≥1.24.0 | Numerical computing |
+| `sentence-transformers` | ≥2.2.0 | Text embeddings |
+| `transformers` | ≥4.30.0 | Transformer models |
+| `torch` | ≥2.0.0 | PyTorch backend |
+| `scikit-learn` | ≥1.3.0 | K-Means, metrics |
+| `hdbscan` | ≥0.8.29 | HDBSCAN clustering |
+| `minisom` | ≥2.3.0 | Self-Organizing Maps |
+| `umap-learn` | ≥0.5.3 | UMAP algorithm |
+| `openai` | ≥1.0.0 | OpenAI API |
+| `deep-translator` | ≥1.11.0 | Translation |
+| `google-api-python-client` | ≥2.0.0 | YouTube Data API |
+| `youtube-transcript-api` | ≥0.6.0 | Transcript extraction |
+| `openpyxl` | ≥3.1.0 | Excel read/write |
+| `matplotlib` | ≥3.7.0 | Plotting |
+| `seaborn` | ≥0.12.0 | Statistical viz |
+
+### API Keys Required / Gerekli API Anahtarları
+
+1. **YouTube Data API v3**
+   - Get from / Alın: [Google Cloud Console](https://console.cloud.google.com/)
+   - Set as / Ayarlayın: `os.environ['YOUTUBE_API_KEY']`
+
+2. **OpenAI API** (Optional / Opsiyonel)
+   - Get from / Alın: [OpenAI Platform](https://platform.openai.com/)
+   - Set as / Ayarlayın: `openai.api_key` or environment variable
+
+### System Requirements / Sistem Gereksinimleri
+
+- **Python**: 3.8 or higher / 3.8 veya üstü
+- **RAM**: 4GB minimum (8GB recommended / önerilir for large datasets)
+- **Storage / Depolama**: 500MB+ for models and data
+- **Internet**: Required for API calls and model downloads (API çağrıları ve model indirmeleri için gerekli)
+- **GPU** (Optional): CUDA-compatible GPU for faster embeddings
 
 ---
 
-## Veri Akışı Diyagramı
+## Data Flow Diagram / Veri Akış Diyagramı
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                      YouTube Playlist                           │
-│                   (Playlist ID: PLnAF...)                        │
-└────────────────────────────┬────────────────────────────────────┘
-                             │
-                             ▼
+│                    DATA COLLECTION PHASE                         │
+│                    VERİ TOPLAMA AŞAMASI                          │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+                    ┌───────────────────┐
+                    │  YouTube Playlist │
+                    └───────────────────┘
+                              │
+                              │ YouTube Data API v3
+                              ▼
+        ┌────────────────────────────────────────┐
+        │  storybox_videos_utf8_bom.csv          │
+        │  (Video List: Title + URL)             │
+        └────────────────────────────────────────┘
+                              │
+                              │ YouTube Transcript API
+                              ▼
+        ┌────────────────────────────────────────┐
+        │  Raw Video Transcripts                 │
+        │  (Ham Video Transkriptleri)            │
+        └────────────────────────────────────────┘
+                              │
+                              │ OpenAI API (Optional)
+                              ▼
+        ┌────────────────────────────────────────┐
+        │  analyzed_storybox_videos.csv          │
+        │  (Transcripts + Summary + Sentiment)   │
+        └────────────────────────────────────────┘
+                              │
+                              │ Manual Curation / Formatting
+                              ▼
+        ┌────────────────────────────────────────┐
+        │  Helsinki_Opus_Transcript.xlsx         │
+        │  (Main Dataset for Clustering)         │
+        └────────────────────────────────────────┘
+
 ┌─────────────────────────────────────────────────────────────────┐
-│              YouTube Data API v3 (playlistItems.list)           │
-│              Kimlik Doğrulama: YOUTUBE_API_KEY                  │
-└────────────────────────────┬────────────────────────────────────┘
-                             │
-                             ▼
+│                  FEATURE ENGINEERING PHASE                       │
+│                  ÖZELLİK MÜHENDİSLİĞİ AŞAMASI                    │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+        ┌────────────────────────────────────────┐
+        │  Text Preprocessing                    │
+        │  • Stopword Removal                    │
+        │  • Normalization                       │
+        │  • Cleaning                            │
+        └────────────────────────────────────────┘
+                              │
+                              │ Sentence-BERT (all-MiniLM-L6-v2)
+                              ▼
+        ┌────────────────────────────────────────┐
+        │  Text Embeddings (384D)                │
+        │  (Metin Gömmesi)                       │
+        └────────────────────────────────────────┘
+                              │
+                              │ UMAP Dimensionality Reduction
+                              ▼
+        ┌────────────────────────────────────────┐
+        │  Reduced Embeddings (2D)               │
+        │  (İndirgenmis Gömme)                   │
+        └────────────────────────────────────────┘
+
 ┌─────────────────────────────────────────────────────────────────┐
-│                      CSV Dosyaları                              │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │  storybox_videos_utf8_bom.csv  (Excel uyumlu)           │   │
-│  │  storybox_videos_utf8.csv       (Standart UTF-8)        │   │
-│  │  storybox_videos_win1254.csv    (Windows Türkçe)        │   │
-│  └──────────────────────────────────────────────────────────┘   │
-│           Sütunlar: [title, url]                                │
-└────────────────────────────┬────────────────────────────────────┘
-                             │
-                             ▼
+│                    CLUSTERING PHASE                              │
+│                    KÜMELEME AŞAMASI                              │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+           ┌──────────────────┼──────────────────┐
+           │                  │                  │
+           ▼                  ▼                  ▼
+    ┌───────────┐      ┌───────────┐     ┌───────────┐
+    │  K-Means  │      │  HDBSCAN  │     │    SOM    │
+    │ (3,4,5)   │      │  (3,5,7)  │     │  (4,6,9)  │
+    └───────────┘      └───────────┘     └───────────┘
+           │                  │                  │
+           └──────────────────┼──────────────────┘
+                              │
+                              ▼
+        ┌────────────────────────────────────────┐
+        │  Cluster Assignments + Quality Scores  │
+        │  (Küme Atamaları + Kalite Skorları)    │
+        └────────────────────────────────────────┘
+
 ┌─────────────────────────────────────────────────────────────────┐
-│                   Her Video için İşlem Döngüsü                  │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │  1. YouTube Transcript API → Transkript Çıkarma         │   │
-│  │  2. OpenAI API → Özet Oluşturma                         │   │
-│  │  3. Google Translate → İngilizce Çeviri                 │   │
-│  │  4. Durum Kaydı (Success/Error/No Transcript)           │   │
-│  └──────────────────────────────────────────────────────────┘   │
-└────────────────────────────┬────────────────────────────────────┘
-                             │
-                             ▼
+│                  INTERPRETATION PHASE                            │
+│                  YORUMLAMA AŞAMASI                               │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+        ┌────────────────────────────────────────┐
+        │  Keyword Extraction (TF-IDF)           │
+        │  (Anahtar Kelime Çıkarma)              │
+        └────────────────────────────────────────┘
+                              │
+                              │ Flan-T5 / Summarization Pipeline
+                              ▼
+        ┌────────────────────────────────────────┐
+        │  LLM-Generated Cluster Labels          │
+        │  (LLM Tarafından Oluşturulan Etiketler)│
+        └────────────────────────────────────────┘
+                              │
+                              ▼
+        ┌────────────────────────────────────────┐
+        │  Visualization (UMAP Scatter Plots)    │
+        │  (Görselleştirme)                      │
+        └────────────────────────────────────────┘
+
 ┌─────────────────────────────────────────────────────────────────┐
-│              Excel: Helsinki_Opus_Transcript.xlsx               │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │  Video URL  │  Transcript  │  Summary                    │   │
-│  │  ───────────┼──────────────┼─────────────                │   │
-│  │  youtube... │  [metin...]  │  [özet...]                  │   │
-│  └──────────────────────────────────────────────────────────┘   │
-└────────────────────────────┬────────────────────────────────────┘
-                             │
-                             ▼
-┌─────────────────────────────────────────────────────────────────┐
-│           SentenceTransformer Embedding (all-MiniLM-L6-v2)      │
-│              Metin → 384 boyutlu vektörler                      │
-└────────────────────────────┬────────────────────────────────────┘
-                             │
-                             ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    UMAP Boyut İndirgeme                         │
-│                   384 boyut → 2 boyut (X, Y)                    │
-│              Görselleştirme ve kümeleme için                    │
-└────────────────────────────┬────────────────────────────────────┘
-                             │
-                ┌────────────┼────────────┐
-                │            │            │
-                ▼            ▼            ▼
-         ┌───────────┐ ┌──────────┐ ┌─────────┐
-         │  K-Means  │ │ HDBSCAN  │ │   SOM   │
-         │ (n=3-5)   │ │(min=3-7) │ │ (2x2-   │
-         │           │ │          │ │  3x3)   │
-         └─────┬─────┘ └────┬─────┘ └────┬────┘
-               │            │            │
-               └────────────┼────────────┘
-                            │
-                            ▼
-         ┌──────────────────────────────────────┐
-         │    OpenAI LLM Küme Etiketleme        │
-         │  - Her kümeden 5-10 örnek            │
-         │  - LLM'e gönder                      │
-         │  - 2-3 kelimelik etiket al           │
-         └──────────────┬───────────────────────┘
-                        │
-                        ▼
-         ┌──────────────────────────────────────┐
-         │      Excel Çıktı Dosyaları           │
-         │  ┌────────────────────────────────┐  │
-         │  │ kmeans_labeled_llm.xlsx        │  │
-         │  │ hdbscan_min5_labeled_llm.xlsx  │  │
-         │  │ som_6_labeled_llm.xlsx         │  │
-         │  └────────────────────────────────┘  │
-         │  Sütunlar:                           │
-         │  - Video URL                         │
-         │  - Transcript/Summary                │
-         │  - Cluster (ID)                      │
-         │  - Cluster_Label (LLM etiketi)       │
-         │  - X_umap, Y_umap                    │
-         └──────────────────────────────────────┘
+│                      OUTPUT PHASE                                │
+│                      ÇIKTI AŞAMASI                               │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+           ┌──────────────────┼──────────────────┐
+           │                  │                  │
+           ▼                  ▼                  ▼
+  ┌──────────────┐   ┌──────────────┐  ┌──────────────┐
+  │ kmeans_*.xlsx│   │hdbscan_*.xlsx│  │  som_*.xlsx  │
+  │              │   │              │  │              │
+  │ • Clusters   │   │ • Clusters   │  │ • Clusters   │
+  │ • Labels     │   │ • Labels     │  │ • Labels     │
+  │ • Themes     │   │ • Themes     │  │ • Themes     │
+  │ • Keywords   │   │ • Keywords   │  │ • Keywords   │
+  └──────────────┘   └──────────────┘  └──────────────┘
 ```
 
 ---
 
-## Kullanılan Kütüphaneler ve Modeller
+## Configuration Parameters / Konfigürasyon Parametreleri
 
-### Kütüphane Kategorileri
-
-| Kategori | Kütüphaneler | Versiyon | Amaç |
-|----------|-------------|----------|------|
-| **YouTube Entegrasyonu** | `google-api-python-client` | ≥2.0.0 | YouTube Data API erişimi |
-| | `youtube-transcript-api` | ≥0.6.0 | Transkript çıkarma |
-| **LLM & NLP** | `openai` | ≥1.0.0 | GPT API erişimi |
-| | `deep-translator` | ≥1.11.0 | Çeviri (tercih edilen) |
-| | `googletrans` | 4.0.0rc1 | Çeviri (yedek) |
-| **Embedding** | `sentence-transformers` | ≥2.2.0 | Metin embedding |
-| | `transformers` | ≥4.30.0 | Transformer modelleri |
-| | `torch` | ≥2.0.0 | PyTorch backend |
-| **Kümeleme** | `scikit-learn` | ≥1.3.0 | K-Means, metriler |
-| | `hdbscan` | ≥0.8.29 | HDBSCAN algoritması |
-| | `minisom` | ≥2.3.0 | Self-Organizing Maps |
-| **Boyut İndirgeme** | `umap-learn` | ≥0.5.3 | UMAP algoritması |
-| **Veri İşleme** | `pandas` | ≥2.0.0 | DataFrame işlemleri |
-| | `numpy` | ≥1.24.0 | Numerik hesaplamalar |
-| | `openpyxl` | ≥3.1.0 | Excel okuma/yazma |
-| **Görselleştirme** | `matplotlib` | ≥3.7.0 | Grafik oluşturma |
-| | `seaborn` | ≥0.12.0 | İstatistiksel görselleştirme |
-| **Ek NLP** | `nltk` | ≥3.8.0 | Stopwords, tokenization |
-
----
-
-### Kullanılan ML/DL Modelleri
-
-#### 1. Sentence Transformer: all-MiniLM-L6-v2
-
-```python
-from sentence_transformers import SentenceTransformer
-model = SentenceTransformer('all-MiniLM-L6-v2')
-```
-
-**Özellikler**:
-- **Model Tipi**: Sentence-BERT
-- **Embedding Boyutu**: 384
-- **Parametre Sayısı**: 22.7M
-- **Diller**: Çok dilli (İngilizce ağırlıklı, Türkçe kısmen destekler)
-- **Performans**: Hızlı çıkarım (~3000 cümle/saniye CPU'da)
-- **Kullanım Alanı**: Semantik benzerlik, kümeleme, sınıflandırma
-
-**Avantajlar**:
-- Hafif ve hızlı
-- Pre-trained, fine-tuning gerektirmez
-- Yüksek kaliteli embedding
-
-**Limitasyonlar**:
-- Türkçe için optimize edilmemiş
-- Maksimum token: 256
-
----
-
-#### 2. UMAP (Uniform Manifold Approximation and Projection)
-
-```python
-import umap
-reducer = umap.UMAP(n_components=2, random_state=42)
-```
-
-**Özellikler**:
-- **Algoritma Tipi**: Manifold öğrenme
-- **Amaç**: Yüksek boyutlu veriyi düşük boyuta indirgeme
-- **Matematiksel Temel**: Topolojik veri analizi
-
-**Parametreler**:
-- `n_components`: 2 (2D görselleştirme için)
-- `n_neighbors`: 15 (yerel komşuluk)
-- `min_dist`: 0.1 (minimum nokta mesafesi)
-- `metric`: 'cosine' veya 'euclidean'
-
-**t-SNE ile Karşılaştırma**:
-- UMAP daha hızlı
-- UMAP global yapıyı daha iyi korur
-- UMAP deterministik (random_state ile)
-
----
-
-#### 3. K-Means Clustering
-
-```python
-from sklearn.cluster import KMeans
-kmeans = KMeans(n_clusters=4, random_state=42)
-```
-
-**Algoritma**: Lloyd'un iteratif K-Means algoritması
-
-**Parametreler**:
-- `n_clusters`: Küme sayısı (3-5 arası test edilir)
-- `n_init`: 10 (farklı başlangıç denemeleri)
-- `max_iter`: 300 (maksimum iterasyon)
-- `random_state`: 42 (tekrarlanabilirlik)
-
-**Optimizasyon**: Küme içi toplam kare hataları minimize eder (WCSS)
-
----
-
-#### 4. HDBSCAN
-
-```python
-import hdbscan
-clusterer = hdbscan.HDBSCAN(min_cluster_size=5)
-```
-
-**Algoritma**: Hierarchical Density-Based Spatial Clustering
-
-**Parametreler**:
-- `min_cluster_size`: Minimum küme büyüklüğü (3-7 arası)
-- `min_samples`: 1 (minimum core noktalar)
-- `metric`: 'euclidean'
-- `cluster_selection_method`: 'eom' (Excess of Mass)
-
-**Özellikler**:
-- Gürültüyü (outlier) otomatik tespit (label=-1)
-- Küme sayısını otomatik belirler
-- Farklı yoğunluklardaki kümeleri bulabilir
-
----
-
-#### 5. Self-Organizing Maps (SOM)
-
-```python
-from minisom import MiniSom
-som = MiniSom(x=3, y=2, input_len=384, sigma=1.0, learning_rate=0.5)
-```
-
-**Algoritma**: Kohonen Self-Organizing Map
-
-**Parametreler**:
-- `x, y`: Grid boyutları (örn. 3x2)
-- `input_len`: 384 (embedding boyutu)
-- `sigma`: 1.0 (komşuluk fonksiyonu genişliği)
-- `learning_rate`: 0.5 (öğrenme hızı)
-- `neighborhood_function`: 'gaussian'
-
-**Eğitim**: 1000 iterasyon rastgele başlatma
-
----
-
-## Konfigürasyon Parametreleri
-
-### API Konfigürasyonu
+### API Configuration / API Konfigürasyonu
 
 ```python
 # YouTube API
@@ -887,38 +1122,19 @@ YOUTUBE_API_URL = "https://www.googleapis.com/youtube/v3"
 
 # OpenAI API
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-OPENAI_MODEL = "gpt-3.5-turbo"  # veya "gpt-4"
+OPENAI_MODEL = "gpt-3.5-turbo"  # or "gpt-4"
 OPENAI_MAX_TOKENS = 2000
 OPENAI_TEMPERATURE = 0.5
 ```
 
----
-
-### Encoding Konfigürasyonu
-
-```python
-# CSV Encoding Seçenekleri
-ENCODINGS = {
-    'utf8_bom': 'utf-8-sig',      # Excel için önerilen
-    'utf8': 'utf-8',                # Standart
-    'win1254': 'windows-1254',      # Windows Türkçe
-    'latin5': 'iso-8859-9'          # ISO Türkçe
-}
-
-# Varsayılan
-DEFAULT_ENCODING = 'utf-8-sig'
-```
-
----
-
-### Kümeleme Parametreleri
+### Clustering Parameters / Kümeleme Parametreleri
 
 #### K-Means
 ```python
 KMEANS_CONFIG = {
     'n_clusters_range': [3, 4, 5],
     'random_state': 42,
-    'n_init': 10,
+    'n_init': 'auto',
     'max_iter': 300,
     'algorithm': 'lloyd'
 }
@@ -931,7 +1147,7 @@ HDBSCAN_CONFIG = {
     'min_samples': 1,
     'metric': 'euclidean',
     'cluster_selection_method': 'eom',
-    'prediction_data': True
+    'gen_min_span_tree': True
 }
 ```
 
@@ -939,176 +1155,212 @@ HDBSCAN_CONFIG = {
 ```python
 SOM_CONFIG = {
     'grids': [(2, 2), (3, 2), (3, 3)],
-    'sigma': 1.0,
+    'sigma': 0.5,
     'learning_rate': 0.5,
-    'num_iterations': 1000,
+    'num_iterations': 100,
     'neighborhood_function': 'gaussian',
     'random_seed': 42
 }
 ```
 
----
-
-### Metin İşleme Parametreleri
+### Text Processing Parameters / Metin İşleme Parametreleri
 
 ```python
-# Keyword Extraction
-KEYWORD_CONFIG = {
-    'max_features': 50,           # İngilizce
-    'max_features_tr': 100,       # Türkçe
-    'ngram_range': (1, 2),        # unigram ve bigram
-    'min_df': 2,                  # Min document frequency
-    'max_df': 0.85                # Max document frequency (% olarak)
-}
-
-# Türkçe Stopwords
+# Turkish Stopwords
 TURKISH_STOPWORDS = {
     've', 'bir', 'bu', 'da', 'de', 'ile', 'için', 'gibi',
     'olarak', 'sonra', 'önce', 'yılında', 'artık', 'çok',
     'tüm', 'her', 'ise', 'daha', 'ben', 'sen', 'o', 'biz',
-    'siz', 'onlar', 'şu', 'şey', 'var', 'yok', 'mi', 'mu', 'mü',
-    'den', 'dan', 'ten', 'tan', 'nin', 'nın', 'nun', 'nün'
+    'siz', 'onlar', 'şu', 'şey', 'var', 'yok', 'mi', 'mu', 'mü'
+}
+
+# Keyword Extraction
+KEYWORD_CONFIG = {
+    'max_features': 100,
+    'ngram_range': (1, 2),
+    'min_df': 2,
+    'max_df': 0.85
 }
 ```
 
----
-
-### LLM Etiketleme Parametreleri
-
-```python
-LLM_LABELING_CONFIG = {
-    'samples_per_cluster': 5,     # Her kümeden kaç örnek
-    'max_samples': 10,            # Maksimum örnek sayısı
-    'label_max_words': 3,         # Etiket maksimum kelime
-    'temperature': 0.3,           # LLM creativity (düşük = tutarlı)
-    'max_tokens': 50,             # Etiket için token limiti
-    'model': 'gpt-3.5-turbo'      # Kullanılacak model
-}
-```
-
----
-
-### UMAP Parametreleri
-
+### UMAP Parameters
 ```python
 UMAP_CONFIG = {
-    'n_components': 2,            # 2D görselleştirme
-    'n_neighbors': 15,            # Yerel komşuluk boyutu
-    'min_dist': 0.1,              # Minimum nokta mesafesi
-    'metric': 'cosine',           # Mesafe metriği
-    'random_state': 42            # Seed
+    'n_components': 2,
+    'n_neighbors': 15,
+    'min_dist': 0.1,
+    'metric': 'cosine',
+    'random_state': 42
 }
 ```
 
 ---
 
-### Embedding Parametreleri
+## Troubleshooting / Sorun Giderme
 
+### Common Errors / Sık Karşılaşılan Hatalar
+
+#### 1. Encoding Errors / Kodlama Hataları
+
+**Problem**: `UnicodeDecodeError` when reading CSV
+**Solution / Çözüm**:
 ```python
-EMBEDDING_CONFIG = {
-    'model_name': 'all-MiniLM-L6-v2',
-    'batch_size': 32,
-    'show_progress_bar': True,
-    'normalize_embeddings': True,
-    'device': 'cpu'  # veya 'cuda' GPU için
-}
+# Try UTF-8 with BOM
+df = pd.read_csv(file, encoding='utf-8-sig')
+
+# Or Windows Turkish
+df = pd.read_csv(file, encoding='windows-1254')
 ```
 
----
+#### 2. API Rate Limit
 
-## Veri Kalitesi ve Validasyon
-
-### Veri Kalitesi Kontrolleri
-
+**Problem**: `429 Too Many Requests` error
+**Solution / Çözüm**:
 ```python
-# 1. Eksik Veri Kontrolü
-def check_missing_data(df):
-    missing = df.isnull().sum()
-    missing_percent = (missing / len(df)) * 100
-    return missing_percent[missing_percent > 0]
+import time
 
-# 2. Duplicate Kontrolü
-def check_duplicates(df, column):
-    duplicates = df[df.duplicated(column, keep=False)]
-    return duplicates
-
-# 3. Encoding Doğrulama
-def validate_encoding(text):
-    try:
-        text.encode('utf-8')
-        return True
-    except UnicodeEncodeError:
-        return False
-
-# 4. Transkript Kalitesi
-def check_transcript_quality(transcript):
-    if len(transcript) < 50:
-        return "Too short"
-    if transcript.count('[') > 5:  # Çok fazla otomatik tag
-        return "Low quality auto-generated"
-    return "OK"
+for video in videos:
+    process_video(video)
+    time.sleep(1)  # Add 1 second delay
 ```
 
----
+#### 3. Transcript Not Available
 
-### Kümeleme Kalite Metrikleri
-
+**Problem**: `TranscriptsDisabled` exception
+**Solution / Çözüm**:
 ```python
-from sklearn.metrics import (
-    silhouette_score,
-    davies_bouldin_score,
-    calinski_harabasz_score
-)
+from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled
 
-# Silhouette Score (-1 ile 1 arası, yüksek = iyi)
-silhouette_avg = silhouette_score(embeddings, clusters)
-
-# Davies-Bouldin Index (düşük = iyi)
-db_score = davies_bouldin_score(embeddings, clusters)
-
-# Calinski-Harabasz Index (yüksek = iyi)
-ch_score = calinski_harabasz_score(embeddings, clusters)
-
-print(f"Silhouette: {silhouette_avg:.3f}")
-print(f"Davies-Bouldin: {db_score:.3f}")
-print(f"Calinski-Harabasz: {ch_score:.3f}")
+try:
+    transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=['tr', 'en'])
+except TranscriptsDisabled:
+    print(f"No transcript for {video_id}")
+    transcript = None
 ```
 
----
+#### 4. Memory Issues
 
-## Veri Güvenliği ve Gizlilik
-
-### API Anahtarı Güvenliği
-
+**Problem**: Out of memory when processing large datasets
+**Solution / Çözüm**:
 ```python
-# YANLIŞ - Kodda hardcode
-api_key = "AIzaSyXXXXXXXXXXXXXXXXXX"  # ASLA YAPMAYIN!
+# Process in batches
+batch_size = 100
+for i in range(0, len(df), batch_size):
+    batch = df[i:i+batch_size]
+    process_batch(batch)
+```
 
-# DOĞRU - Ortam değişkenlerinden yükleme
+#### 5. Model Download Issues
+
+**Problem**: Slow or failed model downloads
+**Solution / Çözüm**:
+```python
+# Set cache directory
 import os
+os.environ['TRANSFORMERS_CACHE'] = '/path/to/cache'
+
+# Use offline mode if models are already downloaded
+model = SentenceTransformer('all-MiniLM-L6-v2', cache_folder='/path/to/cache')
+```
+
+---
+
+## Usage Example / Kullanım Örneği
+
+### Complete Workflow / Tam İş Akışı
+
+```python
+import os
+import pandas as pd
+from googleapiclient.discovery import build
+from youtube_transcript_api import YouTubeTranscriptApi
+from sentence_transformers import SentenceTransformer
+import umap
+from sklearn.cluster import KMeans
+import hdbscan
+
+# 1. Set API Keys
+os.environ['YOUTUBE_API_KEY'] = 'your_youtube_api_key'
+os.environ['OPENAI_API_KEY'] = 'your_openai_api_key'
+
+# 2. Fetch YouTube Playlist (Cells 1-3)
+playlist_id = 'YOUR_PLAYLIST_ID'
+# ... (run playlist fetching code)
+# Output: storybox_videos_utf8_bom.csv
+
+# 3. Extract Transcripts and Analyze (Cells 7-9)
+CSV_FILE = 'storybox_videos_utf8_bom.csv'
+OUTPUT_FILE = 'analyzed_storybox_videos_v2.csv'
+# ... (run transcript extraction code)
+
+# 4. Load Data for Clustering (Cells 10-14)
+df = pd.read_excel('Helsinki_Opus_Transcript.xlsx')
+
+# 5. Generate Embeddings
+model = SentenceTransformer('all-MiniLM-L6-v2')
+embeddings = model.encode(df['transcript'].tolist())
+
+# 6. Dimensionality Reduction
+reducer = umap.UMAP(n_components=2, random_state=42)
+reduced_embeddings = reducer.fit_transform(embeddings)
+
+# 7. Clustering
+# K-Means
+kmeans = KMeans(n_clusters=4, random_state=42)
+df['cluster_kmeans'] = kmeans.fit_predict(reduced_embeddings)
+
+# HDBSCAN
+clusterer = hdbscan.HDBSCAN(min_cluster_size=5)
+df['cluster_hdbscan'] = clusterer.fit_predict(reduced_embeddings)
+
+# 8. LLM Labeling
+# ... (run cluster labeling code)
+
+# 9. Export Results
+df.to_excel('kmeans_4_labeled_llm.xlsx', index=False)
+df.to_excel('hdbscan_min5_labeled_llm.xlsx', index=False)
+```
+
+---
+
+## Data Security & Privacy / Veri Güvenliği ve Gizlilik
+
+### API Key Security / API Anahtarı Güvenliği
+
+**DO NOT / YAPMAYIN**:
+```python
+api_key = "AIzaSyXXXXXXXXXXXXXXXXXX"  # ❌ Never hardcode!
+```
+
+**DO / YAPIN**:
+```python
+import os
+
+# From environment variable
 api_key = os.getenv("YOUTUBE_API_KEY")
 
-# DOĞRU - .env dosyasından
+# Or from .env file
 from dotenv import load_dotenv
 load_dotenv()
 api_key = os.getenv("YOUTUBE_API_KEY")
 ```
 
-### .gitignore Ayarları
+### .gitignore Settings
 
 ```gitignore
-# API anahtarları
+# API keys
 .env
 *.env
 *_api_key.txt
 
-# Büyük veri dosyaları
+# Large data files
 *.xlsx
 *.csv
 analyzed_*.csv
 *_labeled_*.xlsx
+Helsinki_Opus_Transcript.xlsx
 
-# Notebook checkpoint'leri
+# Notebook checkpoints
 .ipynb_checkpoints/
 __pycache__/
 
@@ -1119,83 +1371,68 @@ models/
 
 ---
 
-## Veri Seti Lisansı ve Kullanım Şartları
+## License & Terms / Lisans ve Şartlar
 
-### YouTube Verileri
+### YouTube Data
 
 YouTube API'den alınan veriler için:
-- YouTube'un [Kullanım Şartları](https://www.youtube.com/t/terms)'na uyulmalıdır
-- API kullanım limitlerini aşmayın
-- Verileri izinsiz yeniden dağıtmayın
-- Telif haklarına saygı gösterin
+- YouTube'un [Terms of Service](https://www.youtube.com/t/terms)'ine uyulmalıdır
+- API usage limits must be respected (API kullanım limitlerine uyulmalıdır)
+- Do not redistribute data without permission (verileri izinsiz dağıtmayın)
+- Respect copyright (telif haklarına saygı gösterin)
 
-### OpenAI Verileri
+### OpenAI Data
 
 OpenAI API ile oluşturulan içerik için:
-- OpenAI'ın [Kullanım Politikası](https://openai.com/policies/usage-policies)'na uyulmalıdır
-- Oluşturulan içeriği ticari amaçla kullanmadan önce lisans kontrol edin
+- OpenAI'ın [Usage Policies](https://openai.com/policies/usage-policies)'ine uyulmalıdır
+- Check license before commercial use (ticari kullanım öncesi lisans kontrol edin)
 
 ---
 
-## Sorun Giderme ve SSS
+## References / Referanslar
 
-### Sık Karşılaşılan Hatalar
-
-#### 1. Encoding Hataları
-
-```python
-# Hata: UnicodeDecodeError
-# Çözüm:
-df = pd.read_csv(file, encoding='utf-8-sig')  # BOM ile UTF-8
-# veya
-df = pd.read_csv(file, encoding='windows-1254')  # Windows Türkçe
-```
-
-#### 2. API Rate Limit
-
-```python
-# Hata: 429 Too Many Requests
-# Çözüm: Gecikme ekleyin
-import time
-for video in videos:
-    process_video(video)
-    time.sleep(1)  # 1 saniye bekle
-```
-
-#### 3. Transkript Bulunamadı
-
-```python
-# Hata: TranscriptsDisabled
-# Çözüm: Try-except ile işleyin
-try:
-    transcript = YouTubeTranscriptApi.get_transcript(video_id)
-except TranscriptsDisabled:
-    transcript = None
-    status = "No Transcript"
-```
-
----
-
-## Referanslar ve Kaynaklar
-
-### Akademik Referanslar
+### Academic Papers / Akademik Makaleler
 
 1. **UMAP**: McInnes, L., Healy, J., & Melville, J. (2018). UMAP: Uniform Manifold Approximation and Projection for Dimension Reduction. arXiv:1802.03426.
 
-2. **HDBSCAN**: Campello, R. J., Moulavi, D., & Sander, J. (2013). Density-based clustering based on hierarchical density estimates. Pacific-Asia conference on knowledge discovery and data mining (pp. 160-172).
+2. **HDBSCAN**: Campello, R. J., Moulavi, D., & Sander, J. (2013). Density-based clustering based on hierarchical density estimates. PAKDD 2013.
 
 3. **Sentence-BERT**: Reimers, N., & Gurevych, I. (2019). Sentence-BERT: Sentence Embeddings using Siamese BERT-Networks. EMNLP 2019.
 
 4. **SOM**: Kohonen, T. (1990). The self-organizing map. Proceedings of the IEEE, 78(9), 1464-1480.
 
-### API Dokümantasyonu
+### API Documentation / API Dokümantasyonu
 
 - [YouTube Data API v3](https://developers.google.com/youtube/v3)
 - [YouTube Transcript API](https://github.com/jdepoix/youtube-transcript-api)
 - [OpenAI API](https://platform.openai.com/docs)
 - [Sentence Transformers](https://www.sbert.net/)
+- [UMAP Documentation](https://umap-learn.readthedocs.io/)
+- [HDBSCAN Documentation](https://hdbscan.readthedocs.io/)
 
 ---
 
-**Son Güncelleme**: 2026-01-04
-**Versiyon**: 1.0
+**Last Updated / Son Güncelleme**: 2026-01-04
+**Version / Versiyon**: 2.0
+**Notebook**: YouTube Video Comprehensive Analyzer.ipynb
+**Author / Yazar**: [Your Name]
+**Contact / İletişim**: [Your Email]
+
+---
+
+## Summary / Özet
+
+This document provides comprehensive documentation for all datasets used in the YouTube Video Comprehensive Analyzer notebook, including:
+
+Bu doküman, YouTube Video Kapsamlı Analiz notebook'unda kullanılan tüm veri setleri için kapsamlı dokümantasyon sağlar:
+
+- **3 Main Data Sources**: YouTube Playlist, Transcripts, Analysis Results
+- **4 API Services**: YouTube Data API, YouTube Transcript API, OpenAI API, Translation API
+- **3 Clustering Methods**: K-Means, HDBSCAN, SOM
+- **2 ML Models**: Sentence-BERT, Flan-T5
+- **Multiple Output Formats**: CSV, Excel (XLSX)
+- **Turkish & English Support**: Bilingual processing and analysis
+
+For questions or issues, please refer to the troubleshooting section or contact the maintainers.
+
+Sorular veya sorunlar için lütfen sorun giderme bölümüne bakın veya bakımcılarla iletişime geçin.
