@@ -406,7 +406,7 @@ CSV Export (multiple encodings)
 from googleapiclient.discovery import build
 import csv
 
-API_KEY = os.getenv("YOUTUBE_API_KEY")
+API_KEY = os.getenv("YOUTUBE_API_KEY")  # Loads from environment variable
 youtube = build('youtube', 'v3', developerKey=API_KEY)
 
 videos = []
@@ -1117,11 +1117,11 @@ pip install pandas numpy openpyxl google-api-python-client \
 
 ```python
 # YouTube API
-YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
+YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")  # e.g., "AIzaSyXXXXXXXXXXXXXXXXXXXX"
 YOUTUBE_API_URL = "https://www.googleapis.com/youtube/v3"
 
 # OpenAI API
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")  # e.g., "sk-XXXXXXXXXXXXXXXXXXXXXXXX"
 OPENAI_MODEL = "gpt-3.5-turbo"  # or "gpt-4"
 OPENAI_MAX_TOKENS = 2000
 OPENAI_TEMPERATURE = 0.5
@@ -1280,8 +1280,8 @@ from sklearn.cluster import KMeans
 import hdbscan
 
 # 1. Set API Keys
-os.environ['YOUTUBE_API_KEY'] = 'your_youtube_api_key'
-os.environ['OPENAI_API_KEY'] = 'your_openai_api_key'
+os.environ['YOUTUBE_API_KEY'] = 'YOUR_API_KEY_HERE'  # Replace with your actual key
+os.environ['OPENAI_API_KEY'] = 'YOUR_OPENAI_KEY_HERE'  # Replace with your actual key
 
 # 2. Fetch YouTube Playlist (Cells 1-3)
 playlist_id = 'YOUR_PLAYLIST_ID'
